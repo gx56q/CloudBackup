@@ -6,9 +6,6 @@ class Connection:
     PORT = 443
 
     def __init__(self):
-        """
-        Constructor sets connected to false
-        """
         self.token = None
         self.username = None
         self.password = None

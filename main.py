@@ -39,9 +39,6 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-    host = '192.168.1.1'
-    username = 'test'
-    password = 'test'
     # ftp = FtpClient()
     # ftp.connect(host, username, password)
     # ftp.download('9833-E243/test/', '/local/dir')
@@ -50,5 +47,10 @@ if __name__ == '__main__':
     # ftp.close()
     # Загрузка переменных окружения из файла config.env
     load_dotenv(find_dotenv('config.env'))
-    YA_TOKEN = os.getenv('YA_TOKEN')
+    YA_TOKEN = os.getenv('YADISK_TOKEN')
+    YA_LOGIN = os.getenv('YADISK_USER')
+    YA_PASSWORD = os.getenv('YADISK_PASS')
+    FTP_HOST = os.getenv('FTP_HOST')
+    FTP_USER = os.getenv('FTP_USER')
+    FTP_PASS = os.getenv('FTP_PASS')
 

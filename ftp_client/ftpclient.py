@@ -35,7 +35,7 @@ class FtpClient:
         :raises ValueError: If any of the input parameters are invalid.
         """
         if not self.connection.connected:
-            connect_code = self.connection.f_connect(host)
+            connect_code = self.connection.connect(host)
             if connect_code == '220':
                 self.connection.send_request('USER ' + user)
                 response = self.connection.get_response()
@@ -64,7 +64,7 @@ class FtpClient:
         if self.check_connection():
             self.connection.send_request('QUIT')
             self.connection.get_response()
-            self.connection.f_close()
+            self.connection.close()
             self.logged_in = False
 
     def send_pass(self, password):

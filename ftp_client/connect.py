@@ -7,15 +7,15 @@ class Connection:
 
     def __init__(self):
         """
-        Constructor sets connected to false
+        Initializes connection
         """
         self.host = None
         self.server = None
         self.connected = False
 
-    def f_connect(self, host):
+    def connect(self, host):
         """
-        Connects to server given a host
+        Connects to server
         """
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -30,7 +30,7 @@ class Connection:
         self.connected = True
         return '220'
 
-    def f_close(self):
+    def close(self):
         """
         Closes connection to server
         """
@@ -55,7 +55,7 @@ class Connection:
             return self.parse_response(response)
         except socket.timeout:
             print("Timeout error, connection closed")
-            self.f_close()
+            self.close()
 
     @staticmethod
     def parse_response(response):
