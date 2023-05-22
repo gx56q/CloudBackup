@@ -1,33 +1,183 @@
 import os
 
 from yadisk_client.connect import *
+import xml.etree.ElementTree as Et
+import hashlib
 
 
 class YaDiskClient:
     """
-    Creates new connection object, sets default modes
+    Client for Yandex Disk
     """
     URL = 'https://webdav.yandex.ru/'
     PORT = 443
 
     def __init__(self):
-        self.password = None
-        self.login = None
-        self.token = None
         self.connection = Connection()
-        self.current_dir = os.getcwd()
-        self.logged_in = False
-        # Interaction is on by default (user prompts for actions)
+        self.namespaces = {'d': 'DAV:'}
 
     def set_token(self, token):
-        self.token = token
-        self.login = None
-        self.password = None
+        self.connection.token = token
+        self.connection.username = None
+        self.connection.password = None
 
     def set_auth(self, login, password):
-        self.token = None
-        self.login = login
-        self.password = password
+        self.connection.token = None
+        self.connection.username = login
+        self.connection.password = password
 
-    def check_token(self):
-        self.connection.send_request()
+    def upload_file(self, local_file, remote_file):
+        """Upload file."""
+        local_file = os.path.abspath(local_file)
+        if not os.path.exists(local_file):
+            raise Exception(f'File {local_file} does not exist')
+        with open(local_file, "rb") as f:
+            resp = self.connection.send_request("PUT", remote_file, data=f)
+            print(resp.status_code)
+            if resp.status_code != 201:
+                raise Exception("Error while uploading file: {}".format(resp.content))
+
+    def download_file(self, remote_file, local_file):
+        """Download remote file to disk."""
+        local_file = os.path.abspath(local_file)
+        directory = os.path.dirname(local_file)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        resp = self.connection.send_request("GET", remote_file)
+        if resp.status_code == 200:
+            with open(local_file, "wb") as f:
+                f.write(resp.content)
+        else:
+            raise Exception("Error while downloading file: {}".format(resp.content))
+
+    def download_directory(self, remote_directory, local_directory):
+        """Download remote directory to disk."""
+        remote_directory = '/' + remote_directory.strip("/") + "/"
+        local_directory = os.path.abspath(local_directory)
+        if not os.path.exists(local_directory):
+            os.makedirs(local_directory)
+        directory_contents = self.ls(remote_directory)
+        for file in directory_contents:
+            if file['path'] == remote_directory:
+                continue
+            if file['isDir']:
+                self.download_directory(file['path'], local_directory + os.sep +
+                                        file['displayname'])
+            else:
+                self.download_file(file['path'], local_directory + os.sep + file['displayname'])
+
+    def download(self, remote_path, local_path):
+        """Download file or directory."""
+        if not remote_path.startswith("/"):
+            remote_path = "/" + remote_path
+        if not remote_path.endswith("/"):
+            remote_path += "/"
+        directory_contents = self.ls(remote_path)
+        if len(directory_contents) == 1 and not directory_contents[0]['isDir']:
+            local_path = os.path.abspath(local_path) + os.sep + directory_contents[0]['displayname']
+            self.download_file(remote_path, local_path)
+        else:
+            local_path = os.path.abspath(local_path) + os.sep + \
+                         remote_path.strip("/").split("/")[-1]
+            self.download_directory(remote_path, local_path)
+
+    def ls(self, remote_path):
+        """List files in remote path."""
+        if not remote_path.startswith("/"):
+            remote_path = "/" + remote_path
+        if not remote_path.endswith("/"):
+            remote_path += "/"
+        resp = self.connection.send_request("PROPFIND", remote_path, add_headers={"Depth": "1"})
+        if resp.status_code == 207:
+            res = self.parse_list(resp.content)
+            return res
+        else:
+            raise Exception(f"Error while listing files: {resp.content}")
+
+    def list(self, remote_path):
+        """List all files and directories in remote path recursively."""
+        if not remote_path.startswith("/"):
+            remote_path = "/" + remote_path
+        if not remote_path.endswith("/"):
+            remote_path += "/"
+
+        def process_directory(directory_path, indent=""):
+            directory_contents = self.ls(directory_path)
+            contents = []
+            for file in directory_contents:
+                if file['isDir'] and file['path'] != directory_path:
+                    contents.extend(process_directory(file['path'], indent + "\t"))
+                else:
+                    contents.append((file, indent))
+            return contents
+
+        base_contents = process_directory(remote_path)
+
+        def format_listing(listing, indent):
+            if listing['isDir']:
+                return f"{indent}{listing['displayname'] + os.sep}"
+            else:
+                return "{}{} ({} bytes)"\
+                    .format(indent + "\t", listing['displayname'], listing['length'])
+
+        for item, offset in base_contents:
+            print(format_listing(item, offset))
+        base_contents = [item for item, offset in base_contents]
+        return base_contents
+
+    def parse_list(self, xml):
+        result = []
+        root = Et.fromstring(xml)
+        for response in root.findall('.//d:response', namespaces=self.namespaces):
+            node = {
+                'path': response.find("d:href", namespaces=self.namespaces).text,
+                'creationdate': response.find("d:propstat/d:prop/d:creationdate",
+                                              namespaces=self.namespaces).text,
+                'displayname': response.find("d:propstat/d:prop/d:displayname",
+                                             namespaces=self.namespaces).text,
+                'lastmodified': response.find("d:propstat/d:prop/d:getlastmodified",
+                                              namespaces=self.namespaces).text,
+                'isDir': response.find("d:propstat/d:prop/d:resourcetype/d:collection",
+                                       namespaces=self.namespaces) is not None
+            }
+            if not node['isDir']:
+                node['length'] = response.find("d:propstat/d:prop/d:getcontentlength",
+                                               namespaces=self.namespaces).text
+                node['etag'] = response.find("d:propstat/d:prop/d:getetag",
+                                             namespaces=self.namespaces).text
+                node['type'] = response.find("d:propstat/d:prop/d:getcontenttype",
+                                             namespaces=self.namespaces).text
+            result.append(node)
+        return result
+
+    def make_directory(self, remote_directory):
+        """Make remote directory."""
+        resp = self.connection.send_request("MKCOL", remote_directory)
+        if resp.status_code != 201:
+            raise Exception("Error while creating directory: {}".format(resp.content))
+
+    @staticmethod
+    def get_local_file_info(local_file):
+        """Get local file info."""
+        local_file = os.path.abspath(local_file)
+        if not os.path.exists(local_file):
+            raise Exception("File not found")
+        size = os.path.getsize(local_file)
+        md5 = hashlib.md5(open(local_file, 'rb').read()).hexdigest()
+        sha256 = hashlib.sha256(open(local_file, 'rb').read()).hexdigest()
+        return {"size": str(size), "md5": md5, "sha256": sha256}
+
+    def check_file_exists(self, local_file):
+        """Check if remote file exists."""
+        file_info = self.get_local_file_info(local_file)
+        print(file_info)
+        content_length = file_info["size"]
+        etag = file_info["md5"]
+        sha256 = file_info["sha256"]
+        resp = self.connection.send_request("HEAD", local_file,
+                                            add_headers={"Content-Length": content_length,
+                                                         "Etag": etag, "Sha256": sha256})
+        print(resp.status_code)
+        if resp.status_code == 201:
+            return True
+        return False

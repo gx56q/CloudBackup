@@ -12,7 +12,7 @@ class Connection:
 
     def send_request(self, command, add_url="/", add_headers=None, data=None):
         if self.token is None and (self.username is None or self.password is None):
-            raise Exception("No token or login/password provided")
+            raise ConnectionError("No token or login/password")
         if add_headers is None:
             add_headers = {}
         headers = {"Accept": "*/*"}
