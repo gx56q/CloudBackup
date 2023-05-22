@@ -270,6 +270,7 @@ class FtpClient:
             pasv_con.close()
             self.connection.server.settimeout(20)
             return True
+        return False
 
     async def download_directory(self, remote_dir, local_dir):
         """
