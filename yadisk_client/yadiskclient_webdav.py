@@ -28,13 +28,53 @@ class YaDiskClient:
     def upload_file(self, local_file, remote_file):
         """Upload file."""
         local_file = os.path.abspath(local_file)
-        if not os.path.exists(local_file):
-            raise FileNotFoundError(f'File {local_file} not found')
         with open(local_file, "rb") as file:
             resp = self.connection.send_request("PUT", remote_file, data=file)
-            print(resp.status_code)
-            if resp.status_code != 201:
+            if resp.status_code not in [201, 405]:
                 raise YaDiskException(resp.status_code, resp.content)
+
+    def upload_directory(self, local_dir: str, remote_dir: str) -> None:
+        """
+        Uploads a directory to the server
+
+        :param local_dir: local directory to upload
+        :param remote_dir: remote directory to upload to
+        """
+        self.make_directory(remote_dir)
+        for file_name in os.listdir(local_dir):
+            file_path = os.path.join(local_dir, file_name).replace('\\', '/')
+            if os.path.isdir(file_path):
+                self.upload_directory(file_path, os.path.join(remote_dir, file_name)
+                                      .replace('\\', '/'))
+            else:
+                self.upload_file(file_path, os.path.join(remote_dir, file_name)
+                                 .replace('\\', '/'))
+
+    def upload(self, local_dir: str, remote_dir: str) -> None:
+        """
+        Uploads a file or directory to the server
+
+        :param local_dir: local directory to upload
+        :param remote_dir: remote directory to upload to
+        """
+        path_to_create = ''
+        local_dir = os.path.abspath(local_dir)
+        if not os.path.exists(local_dir):
+            raise FileNotFoundError(f'File/directory {local_dir} not found')
+        if os.path.isdir(local_dir):
+            remote_dir = os.path.join(remote_dir, os.path.basename(local_dir)) \
+                    .replace('\\', '/')
+            for sub_dir in remote_dir.split('/'):
+                path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
+                self.make_directory(path_to_create)
+            self.upload_directory(local_dir, remote_dir)
+        else:
+            for sub_dir in remote_dir.split('/'):
+                path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
+                self.make_directory(path_to_create)
+            self.upload_file(local_dir, os.path.join(remote_dir,
+                                                     os.path.basename(local_dir))
+                             .replace('\\', '/'))
 
     def download_file(self, remote_file, local_file):
         """Download remote file to disk."""
@@ -72,6 +112,8 @@ class YaDiskClient:
         if not remote_path.endswith("/"):
             remote_path += "/"
         directory_contents = self.list_directory(remote_path)
+        if len(directory_contents) == 0:
+            raise FileNotFoundError(f'File/directory {remote_path} not found')
         if len(directory_contents) == 1 and not directory_contents[0]['isDir']:
             local_path = os.path.abspath(local_path) + os.sep + directory_contents[0]['displayname']
             self.download_file(remote_path, local_path)
@@ -90,7 +132,7 @@ class YaDiskClient:
         if resp.status_code == 207:
             res = self.parse_list(resp.content)
             return res
-        raise YaDiskException(resp.status_code, resp.content)
+        return []
 
     def list_directory_recursive(self, remote_path):
         """List all files and directories in remote path recursively."""
@@ -110,6 +152,8 @@ class YaDiskClient:
             return contents
 
         base_contents = process_directory(remote_path)
+        if len(base_contents) == 0:
+            raise FileNotFoundError(f'File/directory {remote_path} not found')
 
         def format_listing(listing, indent):
             if listing['isDir']:
@@ -149,6 +193,7 @@ class YaDiskClient:
 
     def make_directory(self, remote_directory):
         """Make remote directory."""
+        remote_directory = remote_directory.strip("/")
         resp = self.connection.send_request("MKCOL", remote_directory)
-        if resp.status_code != 201:
+        if resp.status_code not in [201, 405]:
             raise YaDiskException(resp.status_code, resp.content)
