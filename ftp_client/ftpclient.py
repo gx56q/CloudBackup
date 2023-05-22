@@ -167,7 +167,7 @@ class FtpClient:
             print(f'Size: {size} bytes')
             return size
 
-    def mkdir(self, directory):
+    def make_directory(self, directory):
         """
         Sends a request to create a directory on the server.
 
@@ -204,7 +204,7 @@ class FtpClient:
             if os.path.isfile(local_file):
                 self.connection.server.settimeout(120)
                 if os.path.dirname(remote_file) != '':
-                    self.mkdir(os.path.dirname(remote_file).replace('\\', '/'))
+                    self.make_directory(os.path.dirname(remote_file).replace('\\', '/'))
                 to_send = open(local_file, 'rb')
                 pasv_con = self.connection.create_pasv_con()
                 if not pasv_con:
@@ -230,7 +230,7 @@ class FtpClient:
         :return: None
         """
         if self.check_connection() and self.check_logged_in():
-            self.mkdir(remote_dir)
+            self.make_directory(remote_dir)
             for file_name in os.listdir(local_dir):
                 file_path = os.path.join(local_dir, file_name).replace('\\', '/')
                 if os.path.isdir(file_path):
@@ -252,7 +252,7 @@ class FtpClient:
                 path_to_create = ''
                 for sub_dir in remote_dir.split('/'):
                     path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
-                    self.mkdir(path_to_create)
+                    self.make_directory(path_to_create)
                 asyncio.run(self.upload_directory(local_dir, remote_dir))
             else:
                 asyncio.run(self.upload_file(local_dir, remote_dir))
