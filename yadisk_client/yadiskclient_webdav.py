@@ -1,6 +1,5 @@
 import os
 import xml.etree.ElementTree as Et
-import hashlib
 from yadisk_client.connect import Connection
 from yadisk_client.yadisk_exception import YaDiskException
 
