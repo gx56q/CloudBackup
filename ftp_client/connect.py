@@ -1,13 +1,20 @@
+"""
+This module provides a Connection class for FTP client.
+"""
+
 import socket
 
 
 class Connection:
+    """
+    Represents a connection to an FTP server.
+    """
 
     PORT = 21
 
     def __init__(self):
         """
-        Initializes connection
+        Initializes the FTP connection.
         """
         self.host = None
         self.server = None
@@ -15,7 +22,11 @@ class Connection:
 
     def connect(self, host):
         """
-        Connects to server
+        Connects to the FTP server.
+
+        :arg: host: The hostname or IP address of the FTP server.
+
+        :returns: The response code if successful, or False if the connection fails.
         """
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -28,7 +39,7 @@ class Connection:
         if not response:
             return False
         self.connected = True
-        return '220'
+        return response['code']
 
     def close(self):
         """
@@ -52,13 +63,14 @@ class Connection:
             response = self.server.recv(1024).decode()
             if not no_print:
                 print(response)
-            return self.parse_response(response)
+            return self._parse_response(response)
         except socket.timeout:
             print("Timeout error, connection closed")
             self.close()
+            return None
 
     @staticmethod
-    def parse_response(response):
+    def _parse_response(response):
         """
         Returns a dictionary with the 3 digit response code and message
         """
@@ -69,9 +81,9 @@ class Connection:
         if code[0] == '4' or code[0] == '5':
             error = True
         return {
-           'code': code,
-           'message': message,
-           'error': error
+            'code': code,
+            'message': message,
+            'error': error
         }
 
     def create_pasv_con(self):
