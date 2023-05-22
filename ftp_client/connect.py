@@ -1,4 +1,6 @@
 """
+FTP Connection module.
+
 This module provides a Connection class for FTP client.
 """
 

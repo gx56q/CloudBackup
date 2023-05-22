@@ -1,3 +1,8 @@
+"""
+FTP Client module.
+
+This module provides a client for interacting with an FTP server.
+"""
 import os
 import asyncio
 
@@ -80,7 +85,7 @@ class FtpClient:
             return True
         return False
 
-    def ls(self, directory=''):
+    def nlist(self, directory=''):
         """
         Sends a request to receive the current working directory's contents.
 
@@ -175,22 +180,22 @@ class FtpClient:
                 with open(local_file, 'rb') as to_send:
                     pasv_con = self.connection.create_pasv_con()
                     if not pasv_con:
-                        print("Error: Could not establish a connection to the server to upload "
-                              "the file {}.".format(local_file))
+                        print('Error: Could not establish a connection to the server to upload '
+                              f'the file {local_file}.')
                         return False
                     self.connection.send_request('STOR ' + remote_file)
                     self.connection.get_response()
                     response = pasv_con.send(to_send.read())
                     if response == 0:
-                        print("Error: Could not upload the file {}.".format(local_file))
+                        print(f'Error: Could not upload the file {local_file}.')
                         return False
                 pasv_con.close()
                 self.connection.get_response()
                 self.connection.server.settimeout(20)
                 return True
-            else:
-                print(local_file + ": file does not exist")
-                return False
+            print(f'Error: {local_file} does not exist.')
+            return False
+        return False
 
     def upload_directory(self, local_dir: str, remote_dir: str) -> None:
         """
@@ -241,21 +246,30 @@ class FtpClient:
             self.connection.server.settimeout(120)
             pasv_con = self.connection.create_pasv_con()
             if not pasv_con:
+                print('Error: Could not establish a connection to the server to download the file'
+                      f' {remote_file}.')
                 return False
             self.connection.send_request('RETR ' + remote_file)
             response = self.connection.get_response()
             if response and response['code'] == '550':
                 pasv_con.close()
+                print(f'Error: Could not download the file {remote_file}.'
+                      ' File does not exist on the server.')
                 return False
-            with open(local_file, 'wb') as f:
+            with open(local_file, 'wb') as file:
                 while True:
                     recv_data = pasv_con.recv(1024)
                     if not recv_data:
                         break
-                    f.write(recv_data)
-            self.connection.get_response()
+                    file.write(recv_data)
+            response = self.connection.get_response()
+            if response and response['code'] == '550':
+                pasv_con.close()
+                print(f'Error: Could not download the file {remote_file}.')
+                return False
             pasv_con.close()
             self.connection.server.settimeout(20)
+            return True
 
     async def download_directory(self, remote_dir, local_dir):
         """
@@ -301,7 +315,7 @@ class FtpClient:
                 local_dir = os.path.join(local_dir, os.path.basename(remote_dir.strip('/')))
                 asyncio.run(self.download_directory(remote_dir, local_dir))
             else:
-                raise FileNotFoundError("No such file or directory: '{}'".format(remote_dir))
+                raise FileNotFoundError(f'No such file or directory: {remote_dir}')
 
     def ascii(self) -> None:
         """
