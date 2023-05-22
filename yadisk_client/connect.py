@@ -22,5 +22,5 @@ class Connection:
         else:
             auth = (self.username, self.password)
         headers.update(add_headers)
-        url = self.username + add_url
+        url = self.URL + add_url
         return request(command, url, headers=headers, auth=auth, data=data)
