@@ -56,7 +56,7 @@ class YaDiskClient:
         local_directory = os.path.abspath(local_directory)
         if not os.path.exists(local_directory):
             os.makedirs(local_directory)
-        directory_contents = self.ls(remote_directory)
+        directory_contents = self.list_directory(remote_directory)
         for file in directory_contents:
             if file['path'] == remote_directory:
                 continue
@@ -72,7 +72,7 @@ class YaDiskClient:
             remote_path = "/" + remote_path
         if not remote_path.endswith("/"):
             remote_path += "/"
-        directory_contents = self.ls(remote_path)
+        directory_contents = self.list_directory(remote_path)
         if len(directory_contents) == 1 and not directory_contents[0]['isDir']:
             local_path = os.path.abspath(local_path) + os.sep + directory_contents[0]['displayname']
             self.download_file(remote_path, local_path)
@@ -81,7 +81,7 @@ class YaDiskClient:
                          remote_path.strip("/").split("/")[-1]
             self.download_directory(remote_path, local_path)
 
-    def ls(self, remote_path):
+    def list_directory(self, remote_path):
         """List files in remote path."""
         if not remote_path.startswith("/"):
             remote_path = "/" + remote_path
@@ -91,10 +91,9 @@ class YaDiskClient:
         if resp.status_code == 207:
             res = self.parse_list(resp.content)
             return res
-        else:
-            raise YaDiskException(resp.status_code, resp.content)
+        raise YaDiskException(resp.status_code, resp.content)
 
-    def list(self, remote_path):
+    def list_directory_recursive(self, remote_path):
         """List all files and directories in remote path recursively."""
         if not remote_path.startswith("/"):
             remote_path = "/" + remote_path
@@ -102,7 +101,7 @@ class YaDiskClient:
             remote_path += "/"
 
         def process_directory(directory_path, indent=""):
-            directory_contents = self.ls(directory_path)
+            directory_contents = self.list_directory(directory_path)
             contents = []
             for file in directory_contents:
                 if file['isDir'] and file['path'] != directory_path:
@@ -116,9 +115,8 @@ class YaDiskClient:
         def format_listing(listing, indent):
             if listing['isDir']:
                 return f"{indent}{listing['displayname'] + os.sep}"
-            else:
-                return "{}{} ({} bytes)" \
-                    .format(indent + "\t", listing['displayname'], listing['length'])
+            return "{}{} ({} bytes)" \
+                .format(indent + "\t", listing['displayname'], listing['length'])
 
         for item, offset in base_contents:
             print(format_listing(item, offset))
@@ -155,29 +153,3 @@ class YaDiskClient:
         resp = self.connection.send_request("MKCOL", remote_directory)
         if resp.status_code != 201:
             raise YaDiskException(resp.status_code, resp.content)
-
-    @staticmethod
-    def get_local_file_info(local_file):
-        """Get local file info."""
-        local_file = os.path.abspath(local_file)
-        if not os.path.exists(local_file):
-            raise Exception("File not found")
-        size = os.path.getsize(local_file)
-        md5 = hashlib.md5(open(local_file, 'rb').read()).hexdigest()
-        sha256 = hashlib.sha256(open(local_file, 'rb').read()).hexdigest()
-        return {"size": str(size), "md5": md5, "sha256": sha256}
-
-    def check_file_exists(self, local_file):
-        """Check if remote file exists."""
-        file_info = self.get_local_file_info(local_file)
-        print(file_info)
-        content_length = file_info["size"]
-        etag = file_info["md5"]
-        sha256 = file_info["sha256"]
-        resp = self.connection.send_request("HEAD", local_file,
-                                            add_headers={"Content-Length": content_length,
-                                                         "Etag": etag, "Sha256": sha256})
-        print(resp.status_code)
-        if resp.status_code == 201:
-            return True
-        return False

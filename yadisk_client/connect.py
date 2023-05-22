@@ -1,3 +1,9 @@
+"""
+YaDisk Connection module.
+
+This module contains the Connection class that handles the connection to the Yandex.Disk API.
+"""
+
 import requests
 from yadisk_client.yadisk_exception import YaDiskException
 
