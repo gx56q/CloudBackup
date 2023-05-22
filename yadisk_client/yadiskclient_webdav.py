@@ -1,8 +1,8 @@
 import os
-
-from yadisk_client.connect import *
 import xml.etree.ElementTree as Et
 import hashlib
+from yadisk_client.connect import Connection
+from yadisk_client.yadisk_exception import YaDiskException
 
 
 class YaDiskClient:
@@ -30,12 +30,12 @@ class YaDiskClient:
         """Upload file."""
         local_file = os.path.abspath(local_file)
         if not os.path.exists(local_file):
-            raise Exception(f'File {local_file} does not exist')
-        with open(local_file, "rb") as f:
-            resp = self.connection.send_request("PUT", remote_file, data=f)
+            raise FileNotFoundError(f'File {local_file} not found')
+        with open(local_file, "rb") as file:
+            resp = self.connection.send_request("PUT", remote_file, data=file)
             print(resp.status_code)
             if resp.status_code != 201:
-                raise Exception("Error while uploading file: {}".format(resp.content))
+                raise YaDiskException(resp.status_code, resp.content)
 
     def download_file(self, remote_file, local_file):
         """Download remote file to disk."""
@@ -45,10 +45,10 @@ class YaDiskClient:
             os.makedirs(directory)
         resp = self.connection.send_request("GET", remote_file)
         if resp.status_code == 200:
-            with open(local_file, "wb") as f:
-                f.write(resp.content)
+            with open(local_file, "wb") as file:
+                file.write(resp.content)
         else:
-            raise Exception("Error while downloading file: {}".format(resp.content))
+            raise YaDiskException(resp.status_code, resp.content)
 
     def download_directory(self, remote_directory, local_directory):
         """Download remote directory to disk."""
@@ -92,7 +92,7 @@ class YaDiskClient:
             res = self.parse_list(resp.content)
             return res
         else:
-            raise Exception(f"Error while listing files: {resp.content}")
+            raise YaDiskException(resp.status_code, resp.content)
 
     def list(self, remote_path):
         """List all files and directories in remote path recursively."""
@@ -117,7 +117,7 @@ class YaDiskClient:
             if listing['isDir']:
                 return f"{indent}{listing['displayname'] + os.sep}"
             else:
-                return "{}{} ({} bytes)"\
+                return "{}{} ({} bytes)" \
                     .format(indent + "\t", listing['displayname'], listing['length'])
 
         for item, offset in base_contents:
@@ -154,7 +154,7 @@ class YaDiskClient:
         """Make remote directory."""
         resp = self.connection.send_request("MKCOL", remote_directory)
         if resp.status_code != 201:
-            raise Exception("Error while creating directory: {}".format(resp.content))
+            raise YaDiskException(resp.status_code, resp.content)
 
     @staticmethod
     def get_local_file_info(local_file):

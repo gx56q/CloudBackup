@@ -1,4 +1,5 @@
 from requests import request
+from yadisk_client.yadisk_exception import YaDiskException
 
 
 class Connection:
@@ -12,13 +13,13 @@ class Connection:
 
     def send_request(self, command, add_url="/", add_headers=None, data=None):
         if self.token is None and (self.username is None or self.password is None):
-            raise ConnectionError("No token or login/password")
+            raise YaDiskException(400, "Specify token or login/password for Yandex.Disk account.")
         if add_headers is None:
             add_headers = {}
         headers = {"Accept": "*/*"}
         auth = None
         if self.token is not None:
-            headers["Authorization"] = "OAuth %s".format(self.token)
+            headers["Authorization"] = f"OAuth {self.token}"''
         else:
             auth = (self.username, self.password)
         headers.update(add_headers)
