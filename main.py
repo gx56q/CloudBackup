@@ -1,12 +1,12 @@
 import click
+
 from ftp_client.ftpclient import FtpClient
-from yadisk_client.yadiskclient_webdav import YaDiskClient
+from webdav_api_client.webdav_client import WebDavClient
 
 
 @click.command()
-@click.option('-c', '--client_type', type=click.Choice(['ftp', 'yadisk']), required=True,
-              help='Client'
-                   'to use.')
+@click.option('-c', '--client_type', type=click.Choice(['ftp', 'yadisk', 'cloud_mail']),
+              required=True, help='Client''to use.')
 @click.option('--host', type=str, metavar='HOST', help='FTP host.')
 @click.option('-u', '--user', type=str, metavar='USERNAME', help='Username.')
 @click.option('-p', '--pass', 'password', type=str, metavar='PASSWORD', help='Password.')
@@ -34,27 +34,29 @@ def cli(client_type, host, user, password, token, download, upload, list_files):
             remote_path = list_files
             ftp_client.list(remote_path, True)
         ftp_client.close()
-    elif client_type == 'yadisk':
-        yadisk_client = YaDiskClient()
-        if token:
-            yadisk_client.set_token(token)
-        elif user and password:
-            yadisk_client.set_auth(user, password)
+    elif client_type == 'yadisk' or client_type == 'cloud_mail':
+        if client_type == 'cloud_mail':
+            webdav_client = WebDavClient('cloud_mail')
         else:
-            raise click.UsageError('For Yandex Disk client, --user and --pass or --token are '
+            webdav_client = WebDavClient('yadisk')
+        if token:
+            webdav_client.set_token(token)
+        elif user and password:
+            webdav_client.set_auth(user, password)
+        else:
+            raise click.UsageError('For WebDav client, --user and --pass or --token are '
                                    'required.')
         if download:
             remote_path, local_path = download
-            yadisk_client.download(remote_path, local_path)
-            click.echo(f"Yandex Disk: Downloaded {remote_path} to {local_path}")
+            webdav_client.download(remote_path, local_path)
         if upload:
             local_path, remote_path = upload
-            yadisk_client.upload(local_path, remote_path)
-            click.echo(f"Yandex Disk: Uploaded {local_path} to {remote_path}")
+            webdav_client.upload(local_path, remote_path)
         if list_files:
             directory = list_files
-            yadisk_client.list_directory_recursive(directory)
-            click.echo(f"Yandex Disk: Listing files at {directory}")
+            webdav_client.list_directory_recursive(directory)
+    else:
+        raise click.UsageError('Invalid client type.')
 
 
 if __name__ == '__main__':
