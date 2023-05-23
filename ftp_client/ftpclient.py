@@ -24,7 +24,6 @@ class FtpClient:
         Initializes a new FtpClient object with default modes.
         """
         self.connection = Connection()
-        self.current_dir = os.getcwd()
         self.transfer_type = ('I', 'binary')
         self.logged_in = False
 
@@ -303,36 +302,6 @@ class FtpClient:
                 asyncio.run(self.download_directory(remote_dir, local_dir))
             else:
                 raise FileNotFoundError(f'No such file or directory: {remote_dir}')
-
-    def ascii(self) -> None:
-        """
-        Sets transfer type to ASCII (for text files).
-
-        :raises ConnectionError: if the transfer type could not be set to ASCII
-        """
-        if self._check_connection() and self._check_logged_in():
-            self.connection.send_request('TYPE A')
-            response = self.connection.get_response()
-            if not response['error']:
-                self.transfer_type = ('A', 'ascii')
-            else:
-                print(response['message'])
-                raise ConnectionError("Could not set transfer type to ASCII.")
-
-    def image(self) -> None:
-        """
-        Sets transfer type to binary (for image or binary files).
-
-        :raises ConnectionError: if the transfer type could not be set to binary
-        """
-        if self._check_connection() and self._check_logged_in():
-            self.connection.send_request('TYPE I')
-            response = self.connection.get_response()
-            if not response['error']:
-                self.transfer_type = ('I', 'binary')
-            else:
-                print(response['message'])
-                raise ConnectionError("Could not set transfer type to binary.")
 
     def _check_connection(self) -> bool:
         """

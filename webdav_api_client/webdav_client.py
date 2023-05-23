@@ -13,10 +13,8 @@ class WebDavClient:
     def __init__(self, cloud_type='yadisk'):
         if cloud_type == 'yadisk':
             self.connection = Connection('yadisk')
-            self.base_dir = ''
         elif cloud_type == 'cloud_mail':
             self.connection = Connection('cloud_mail')
-            self.base_dir = 'Cloud/'
         self.namespaces = {'d': 'DAV:'}
 
     def set_token(self, token):
@@ -180,12 +178,8 @@ class WebDavClient:
         for response in root.findall('.//d:response', namespaces=self.namespaces):
             node = {
                 'path': response.find("d:href", namespaces=self.namespaces).text,
-                'creationdate': response.find("d:propstat/d:prop/d:creationdate",
-                                              namespaces=self.namespaces),
                 'displayname': response.find("d:propstat/d:prop/d:displayname",
                                              namespaces=self.namespaces).text,
-                'lastmodified': response.find("d:propstat/d:prop/d:getlastmodified",
-                                              namespaces=self.namespaces),
                 'isDir': response.find("d:propstat/d:prop/d:resourcetype/d:collection",
                                        namespaces=self.namespaces) is not None
             }
@@ -196,7 +190,6 @@ class WebDavClient:
                                              namespaces=self.namespaces).text
                 node['type'] = response.find("d:propstat/d:prop/d:getcontenttype",
                                              namespaces=self.namespaces).text
-                node['lastmodified'] = node['lastmodified'].text
             result.append(node)
         return result
 
