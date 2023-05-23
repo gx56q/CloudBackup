@@ -6,7 +6,7 @@ from webdav_api_client.webdav_client import WebDavClient
 
 @click.command()
 @click.option('-c', '--client_type', type=click.Choice(['ftp', 'yadisk', 'cloud_mail']),
-              required=True, help='Client''to use.')
+              required=True, help='Client to use.')
 @click.option('-h', '--host', type=str, metavar='HOST', help='FTP host.')
 @click.option('-u', '--user', type=str, metavar='USERNAME', help='Username.')
 @click.option('-p', '--pass', 'password', type=str, metavar='PASSWORD', help='Password.')
