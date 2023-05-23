@@ -1,18 +1,22 @@
 import os
 import xml.etree.ElementTree as Et
-from yadisk_client.connect import Connection
-from yadisk_client.yadisk_exception import YaDiskException
+
+from webdav_api_client.connect import Connection
+from webdav_api_client.webdav_exception import WebDavException
 
 
-class YaDiskClient:
+class WebDavClient:
     """
-    Client for Yandex Disk
+    Client for WebDav API.
     """
-    URL = 'https://webdav.yandex.ru/'
-    PORT = 443
 
-    def __init__(self):
-        self.connection = Connection()
+    def __init__(self, cloud_type='yadisk'):
+        if cloud_type == 'yadisk':
+            self.connection = Connection('yadisk')
+            self.base_dir = ''
+        elif cloud_type == 'cloud_mail':
+            self.connection = Connection('cloud_mail')
+            self.base_dir = 'Cloud/'
         self.namespaces = {'d': 'DAV:'}
 
     def set_token(self, token):
@@ -31,7 +35,7 @@ class YaDiskClient:
         with open(local_file, "rb") as file:
             resp = self.connection.send_request("PUT", remote_file, data=file)
             if resp.status_code not in [201, 405]:
-                raise YaDiskException(resp.status_code, resp.content)
+                raise WebDavException(resp.status_code, resp.content)
 
     def upload_directory(self, local_dir: str, remote_dir: str) -> None:
         """
@@ -59,17 +63,20 @@ class YaDiskClient:
         """
         path_to_create = ''
         local_dir = os.path.abspath(local_dir)
+        remote_dir = remote_dir.strip('/')
+        if not remote_dir.startswith('/'):
+            remote_dir = '/' + remote_dir
         if not os.path.exists(local_dir):
             raise FileNotFoundError(f'File/directory {local_dir} not found')
         if os.path.isdir(local_dir):
             remote_dir = os.path.join(remote_dir, os.path.basename(local_dir)) \
-                    .replace('\\', '/')
-            for sub_dir in remote_dir.split('/'):
+                .replace('\\', '/')
+            for sub_dir in remote_dir.strip('/').split('/'):
                 path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
                 self.make_directory(path_to_create)
             self.upload_directory(local_dir, remote_dir)
         else:
-            for sub_dir in remote_dir.split('/'):
+            for sub_dir in remote_dir.strip('/').split('/'):
                 path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
                 self.make_directory(path_to_create)
             self.upload_file(local_dir, os.path.join(remote_dir,
@@ -87,7 +94,7 @@ class YaDiskClient:
             with open(local_file, "wb") as file:
                 file.write(resp.content)
         else:
-            raise YaDiskException(resp.status_code, resp.content)
+            raise WebDavException(resp.status_code, resp.content)
 
     def download_directory(self, remote_directory, local_directory):
         """Download remote directory to disk."""
@@ -97,7 +104,7 @@ class YaDiskClient:
             os.makedirs(local_directory)
         directory_contents = self.list_directory(remote_directory)
         for file in directory_contents:
-            if file['path'] == remote_directory:
+            if file['path'].strip('/') == remote_directory.strip('/'):
                 continue
             if file['isDir']:
                 self.download_directory(file['path'], local_directory + os.sep +
@@ -145,13 +152,14 @@ class YaDiskClient:
             directory_contents = self.list_directory(directory_path)
             contents = []
             for file in directory_contents:
-                if file['isDir'] and file['path'] != directory_path:
+                if file['isDir'] and file['path'].strip('/') != directory_path.strip('/'):
                     contents.extend(process_directory(file['path'], indent + "\t"))
                 else:
                     contents.append((file, indent))
             return contents
 
         base_contents = process_directory(remote_path)
+
         if len(base_contents) == 0:
             raise FileNotFoundError(f'File/directory {remote_path} not found')
 
@@ -173,11 +181,11 @@ class YaDiskClient:
             node = {
                 'path': response.find("d:href", namespaces=self.namespaces).text,
                 'creationdate': response.find("d:propstat/d:prop/d:creationdate",
-                                              namespaces=self.namespaces).text,
+                                              namespaces=self.namespaces),
                 'displayname': response.find("d:propstat/d:prop/d:displayname",
                                              namespaces=self.namespaces).text,
                 'lastmodified': response.find("d:propstat/d:prop/d:getlastmodified",
-                                              namespaces=self.namespaces).text,
+                                              namespaces=self.namespaces),
                 'isDir': response.find("d:propstat/d:prop/d:resourcetype/d:collection",
                                        namespaces=self.namespaces) is not None
             }
@@ -188,12 +196,15 @@ class YaDiskClient:
                                              namespaces=self.namespaces).text
                 node['type'] = response.find("d:propstat/d:prop/d:getcontenttype",
                                              namespaces=self.namespaces).text
+                node['lastmodified'] = node['lastmodified'].text
             result.append(node)
         return result
 
     def make_directory(self, remote_directory):
         """Make remote directory."""
         remote_directory = remote_directory.strip("/")
+        if not remote_directory.startswith("/"):
+            remote_directory = "/" + remote_directory
         resp = self.connection.send_request("MKCOL", remote_directory)
         if resp.status_code not in [201, 405]:
-            raise YaDiskException(resp.status_code, resp.content)
+            raise WebDavException(resp.status_code, resp.content)

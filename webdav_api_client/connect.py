@@ -1,27 +1,32 @@
 """
-YaDisk Connection module.
+WebDav Connection module.
 
-This module contains the Connection class that handles the connection to the Yandex.Disk API.
+This module contains the Connection class that handles the connection to the WebDav API.
 """
 
 import requests
-from yadisk_client.yadisk_exception import YaDiskException
+from webdav_api_client.webdav_exception import WebDavException
 
 
 class Connection:
-    """Handles the connection to Yandex.Disk API."""
+    """Handles the connection to WebDav API."""
 
-    URL = 'https://webdav.yandex.ru/'
+    YADISK_URL = 'https://webdav.yandex.ru/'
+    CLOUD_MAIL_URL = 'https://webdav.cloud.mail.ru'
     PORT = 443
 
-    def __init__(self):
+    def __init__(self, cloud_type='yadisk'):
         self.token = None
         self.username = None
         self.password = None
+        if cloud_type == 'yadisk':
+            self.URL = self.YADISK_URL
+        elif cloud_type == 'cloud_mail':
+            self.URL = self.CLOUD_MAIL_URL
 
     def send_request(self, command, add_url="/", add_headers=None, data=None):
         """
-        Send an HTTP request to Yandex.Disk API.
+        Send an HTTP request to WebDav API.
 
         Args:
             command (str): The HTTP command to send (e.g., GET, POST, PROPFIND).
@@ -33,10 +38,11 @@ class Connection:
             requests.Response: The response from the API.
 
         Raises:
-            YaDiskException: If token or login/password is not specified.
+            WebDavException: If token or login/password is not specified.
         """
         if self.token is None and (self.username is None or self.password is None):
-            raise YaDiskException(400, "Specify token or login/password for Yandex.Disk account.")
+            raise WebDavException(400,
+                                  "Specify token or login/password for WebDav storage account.")
 
         if add_headers is None:
             add_headers = {}
