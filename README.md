@@ -10,7 +10,25 @@
 ## Usage
 
 ```sh
-main.py --help
+python3 main.py --help
+'''returns: 
+  -c, --client_type [ftp|yadisk|cloud_mail]
+                                  Client to use.  [required]
+  -h, --host HOST                 FTP host.
+  -u, --user USERNAME             Username.
+  -p, --pass PASSWORD             Password.
+  -t, --token TOKEN               OAuth token.
+  -d, --download ('REMOTE_PATH', 'LOCAL_PATH')
+                                  Download a file from the remote path to the
+                                  local path.
+  -up, --upload ('LOCAL_PATH', 'REMOTE_PATH')
+                                  Upload a file from the local path to the
+                                  remote path.
+  -l, --list REMOTE_PATH          List files at the remote path.
+  --help                          Show this message and exit.
+  '''
+
+
 ```
 
 ## Author
