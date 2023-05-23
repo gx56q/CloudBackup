@@ -34,7 +34,7 @@ def cli(client_type, host, user, password, token, download, upload, list_files):
             remote_path = list_files
             ftp_client.list(remote_path, True)
         ftp_client.close()
-    elif client_type == 'yadisk' or client_type == 'cloud_mail':
+    elif client_type in ['yadisk', 'cloud_mail']:
         if client_type == 'cloud_mail':
             webdav_client = WebDavClient('cloud_mail')
         else:

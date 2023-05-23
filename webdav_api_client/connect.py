@@ -20,9 +20,9 @@ class Connection:
         self.username = None
         self.password = None
         if cloud_type == 'yadisk':
-            self.URL = self.YADISK_URL
+            self.url = self.YADISK_URL
         elif cloud_type == 'cloud_mail':
-            self.URL = self.CLOUD_MAIL_URL
+            self.url = self.CLOUD_MAIL_URL
 
     def send_request(self, command, add_url="/", add_headers=None, data=None):
         """
@@ -56,5 +56,5 @@ class Connection:
             auth = (self.username, self.password)
 
         headers.update(add_headers)
-        url = self.URL + add_url
+        url = self.url + add_url
         return requests.request(command, url, headers=headers, auth=auth, data=data)
