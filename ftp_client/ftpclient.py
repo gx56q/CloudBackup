@@ -53,7 +53,7 @@ class FtpClient:
                         raise ValueError("Login failed.")
                     if self.logged_in:
                         self.connection.send_request('TYPE I')
-                        self.connection.get_response(True)
+                        self.connection.get_response()
             else:
                 raise ConnectionError("Error: " + host + " is not a valid host.")
 
@@ -107,12 +107,13 @@ class FtpClient:
             pasv_con.close()
         return result
 
-    def list(self, directory='', list_all=False):
+    def list(self, directory='', list_all=False, print_result=False):
         """
         Sends a request to receive the contents of a directory on the server.
 
         :param directory: The name of the directory to list (default is the current directory).
         :param list_all: Whether to list directories recursively.
+        :param print_result: Whether to print the result to the console.
 
         :return: A list of strings representing the contents of the directory.
 
@@ -129,7 +130,8 @@ class FtpClient:
                 self.connection.send_request('LIST ' + directory)
             self.connection.get_response()
             from_server = pasv_con.recv(4096).decode('utf-8')
-            print(from_server)
+            if print_result:
+                print(from_server)
             result = list(filter(None, from_server.strip('\r\n').split('\r\n')))
             self.connection.get_response()
             pasv_con.close()
@@ -146,22 +148,6 @@ class FtpClient:
         if self._check_connection() and self._check_logged_in():
             self.connection.send_request('MKD ' + directory)
             self.connection.get_response()
-
-    def rmdir(self, directory: str) -> None:
-        """
-        Sends a request to delete a directory on the server.
-
-        :param directory: Path to the directory to delete.
-
-        :raises ValueError: If directory deletion fails.
-        """
-        if self._check_connection() and self._check_logged_in():
-            self.connection.send_request('RMD ' + directory)
-            response = self.connection.get_response()
-            if response and response['code'] == '250':
-                print("Directory deleted successfully.")
-            else:
-                raise ValueError("Directory deletion failed.")
 
     def upload_file(self, local_file: str, remote_file: str) -> bool:
         """
@@ -282,7 +268,7 @@ class FtpClient:
         """
         if not os.path.exists(local_dir):
             os.makedirs(local_dir)
-        files = self.list(remote_dir, False)
+        files = self.list(remote_dir, False, False)
         for line in files:
             fields = line.split()
             name = fields[-1]
@@ -304,7 +290,7 @@ class FtpClient:
         :raises FileNotFoundError: if the remote file or directory does not exist
         """
         if self._check_connection() and self._check_logged_in():
-            file_list = self.list(remote_dir, False)
+            file_list = self.list(remote_dir, False, False)
             if len(file_list) == 1:
                 if file_list[0].startswith('d'):
                     local_dir = os.path.join(local_dir, os.path.basename(remote_dir.strip('/')))

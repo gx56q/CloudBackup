@@ -7,7 +7,7 @@ from webdav_api_client.webdav_client import WebDavClient
 @click.command()
 @click.option('-c', '--client_type', type=click.Choice(['ftp', 'yadisk', 'cloud_mail']),
               required=True, help='Client''to use.')
-@click.option('--host', type=str, metavar='HOST', help='FTP host.')
+@click.option('-h', '--host', type=str, metavar='HOST', help='FTP host.')
 @click.option('-u', '--user', type=str, metavar='USERNAME', help='Username.')
 @click.option('-p', '--pass', 'password', type=str, metavar='PASSWORD', help='Password.')
 @click.option('-t', '--token', type=str, metavar='TOKEN', help='OAuth token.')
@@ -32,7 +32,7 @@ def cli(client_type, host, user, password, token, download, upload, list_files):
             ftp_client.upload(local_path, remote_path)
         if list_files:
             remote_path = list_files
-            ftp_client.list(remote_path, True)
+            ftp_client.list(remote_path, True, True)
         ftp_client.close()
     elif client_type in ['yadisk', 'cloud_mail']:
         if client_type == 'cloud_mail':

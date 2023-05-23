@@ -57,13 +57,13 @@ class Connection:
         request = request.strip()
         self.server.sendall(f'{request}\r\n'.encode())
 
-    def get_response(self, *no_print):
+    def get_response(self, print_response=False):
         """
         Receives response from server, prints and returns the parsed result
         """
         try:
             response = self.server.recv(1024).decode()
-            if not no_print:
+            if print_response:
                 print(response)
             return self._parse_response(response)
         except socket.timeout:
