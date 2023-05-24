@@ -55,8 +55,6 @@ def cli(client_type, host, user, password, token, download, upload, list_files):
         if list_files:
             directory = list_files
             webdav_client.list_directory_recursive(directory)
-    else:
-        raise click.UsageError('Invalid client type.')
 
 
 if __name__ == '__main__':
