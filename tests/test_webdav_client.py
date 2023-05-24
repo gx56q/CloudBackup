@@ -1,12 +1,15 @@
 import os
 import unittest
 from unittest.mock import MagicMock
+
+from dotenv import load_dotenv, find_dotenv
 from webdav_api_client.webdav_client import WebDavClient
 from webdav_api_client.webdav_exception import WebDavException
 
 
 class TestWebdavClient(unittest.TestCase):
     def setUp(self):
+        load_dotenv(find_dotenv('config.env'))
         self.client = WebDavClient()
 
     def test_set_token(self):

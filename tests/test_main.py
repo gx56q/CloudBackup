@@ -90,6 +90,16 @@ class TestCli(unittest.TestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertIn('Invalid value', result.output)
 
+    def test_cli_runs(self):
+        """
+        Tests that the CLI runs without errors.
+        """
+        try:
+            # Run the CLI from the main.py file,  note that main.py is in the root directory and not in the tests directory
+            exec(open('C:\\Users\\andre\\PycharmProjects\\CloudBackup\\main.py').read())
+        except Exception as e:
+            self.fail(f"CLI failed to run with error: {e}")
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -67,9 +67,7 @@ class TestWebdavConnect(unittest.TestCase):
         """
         Tests that the `send_request` method returns a response with the data included in the request body.
         """
-        # get from config.env
         load_dotenv(find_dotenv('config.env'))
-        print(os.getenv('YADISK_TOKEN'))
         self.connection.username = os.getenv('YADISK_USER')
         self.connection.password = os.getenv('YADISK_PASS')
         data = {"key": "value"}
@@ -79,5 +77,4 @@ class TestWebdavConnect(unittest.TestCase):
 
 if __name__ == '__main__':
     load_dotenv(find_dotenv('config.env'))
-    print(os.getenv('YADISK_TOKEN'))
     unittest.main()

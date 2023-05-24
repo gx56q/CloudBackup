@@ -1,4 +1,3 @@
-import os
 import unittest
 from unittest.mock import patch, MagicMock, Mock
 
@@ -31,6 +30,42 @@ class TestFtpClient(unittest.TestCase):
                     with patch.object(self.client, '_send_pass', return_value=True):
                         self.client.connect('localhost', 'username', 'password')
                         self.assertFalse(self.client.logged_in)
+
+    def test_connect_successful(self):
+        host = 'ftp.example.com'
+        user = 'username'
+        password = 'password'
+        self.client.connection.connected = False
+        self.client.connection.connect = MagicMock(return_value='220')
+        self.client.connection.send_request = MagicMock()
+        self.client.connection.get_response = MagicMock()
+        self.client.connect(host, user, password)
+        self.assertEqual(self.client.connection.connect.call_args[0][0], host)
+        self.assertEqual(self.client.connection.send_request.call_count, 1)
+        self.assertEqual(self.client.connection.get_response.call_count, 1)
+        self.assertEqual(self.client.connection.send_request.call_args[0][0], 'USER ' + user)
+
+    def test_connect_connection_error(self):
+        host = 'ftp.invalidhost.com'
+        user = 'username'
+        password = 'password'
+        self.client.connection.connected = False
+        self.client.connection.connect = MagicMock(
+            side_effect=ConnectionError('Error: ' + host + ' is not a valid host.'))
+        with self.assertRaises(ConnectionError):
+            self.client.connect(host, user, password)
+
+    def test_connect_login_failed(self):
+        host = 'ftp.example.com'
+        user = 'username'
+        password = 'wrong_password'
+        self.client.connection.connected = False
+        self.client.connection.connect = MagicMock(return_value='220')
+        self.client.connection.send_request = MagicMock()
+        self.client.connection.get_response = MagicMock(
+            side_effect=[{'code': '331'}, {'code': '500'}])
+        with self.assertRaises(ValueError):
+            self.client.connect(host, user, password)
 
     def test_close(self):
         """
@@ -97,7 +132,8 @@ class TestFtpClient(unittest.TestCase):
 
     def test_check_connection_not_connected(self):
         """
-        Tests that the `_check_connection` method raises a `ConnectionError` if the client is not connected.
+        Tests that the `_check_connection` method raises a `ConnectionError` if the client is not
+        connected.
         """
         self.client.connection.connected = False
         self.assertRaises(ConnectionError, self.client._check_connection)
@@ -191,13 +227,14 @@ class TestFtpClient(unittest.TestCase):
         self.assertFalse(self.client.download_file(remote_file, local_file))
 
     def test_download_directory(self):
-        remote_dir = '/path/to/remote/directory'
-        local_dir = '/path/to/local/directory'
+        remote_dir = 'path/to/remote/directory'
+        local_dir = 'path/to/local/directory'
         self.client._check_connection = MagicMock(return_value=True)
         self.client._check_logged_in = MagicMock(return_value=True)
-        self.client.list = MagicMock(
-            return_value=['drwxr-xr-x  3 user group      4096 May 20 15:43 dir1',
-                          '-rw-r--r--  1 user group      1234 May 20 15:43 file1.txt'])
+        self.client.list = MagicMock(return_value=['-rw-rw-r--   1 ftp      ftp            15 '
+                                                   'May 24 15:30 file1.txt',
+                                                   'drwxrwxr-x   2 ftp      ftp          4096 May '
+                                                   '24 15:30 folder1'])
         self.client.download_directory = MagicMock()
         self.client.download_file = MagicMock()
         self.client.download_directory(remote_dir, local_dir)
@@ -227,6 +264,20 @@ class TestFtpClient(unittest.TestCase):
         self.assertEqual(self.client.list.call_count, 1)
         self.assertEqual(self.client.download_directory.call_count, 0)
         self.assertEqual(self.client.download_file.call_count, 1)
+
+    def test_download_file_success(self):
+        remote_file = 'path/to/remote_file'
+        local_file = 'path/to/local_file'
+        self.client._check_connection = MagicMock(return_value=True)
+        self.client._check_logged_in = MagicMock(return_value=True)
+        self.client.connection.server.timeout = MagicMock()
+        self.client.connection.create_pasv_con = MagicMock(return_value=MagicMock(bytearray))
+        self.client.connection.send_request = MagicMock()
+        self.client.connection.get_response = MagicMock()
+        self.client.connection.get_response.return_value = {'code': '200'}
+        self.client.download_file(remote_file, local_file)
+        self.assertEqual(self.client.connection.server.settimeout.call_count, 1)
+        self.assertEqual(self.client.connection.create_pasv_con.call_count, 1)
 
 
 if __name__ == '__main__':
