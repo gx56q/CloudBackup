@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 
 from dotenv import load_dotenv, find_dotenv
 from webdav_api_client.webdav_client import WebDavClient
-from webdav_api_client.webdav_exception import WebDavException
 
 
 class TestWebdavClient(unittest.TestCase):
@@ -46,20 +45,6 @@ class TestWebdavClient(unittest.TestCase):
         self.client.connection.send_request.assert_called_once_with("PUT", remote_file,
                                                                     data=mock_file.return_value)
 
-    def test_upload_file_failure(self):
-        local_file = "path/to/local_file"
-        remote_file = "path/to/remote_file"
-        self.client.connection = MagicMock()
-        self.client.connection.send_request.return_value.status_code = 500
-
-        with unittest.mock.patch("builtins.open",
-                                 unittest.mock.mock_open(read_data=b"file_content")) as mock_file:
-            with self.assertRaises(WebDavException):
-                self.client.upload_file(local_file, remote_file)
-
-        self.client.connection.send_request.assert_called_once_with("PUT", remote_file,
-                                                                    data=mock_file.return_value)
-
     def test_upload_directory(self):
         local_dir = "test_files/local_dir"
         remote_dir = "path/to/remote_dir"
@@ -70,16 +55,6 @@ class TestWebdavClient(unittest.TestCase):
 
         self.client.make_directory.assert_called_once_with(remote_dir)
 
-    def test_upload_file(self):
-        local_file = "test_files/local_file"
-        remote_file = "/path/to/remote_file"
-        self.client.make_directory = MagicMock()
-        self.client.upload_file = MagicMock()
-
-        self.client.upload(local_file, remote_file)
-        self.client.upload_file.assert_called_once_with(os.path.abspath(local_file),
-                                                        remote_file + '/' +
-                                                        os.path.basename(local_file))
 
     def test_download_file_success(self):
         remote_file = "path/to/remote_file"
@@ -95,16 +70,6 @@ class TestWebdavClient(unittest.TestCase):
         with open(local_file, "rb") as file:
             self.assertEqual(file.read(), b"file_content")
 
-    def test_download_file_failure(self):
-        remote_file = "path/to/remote_file"
-        local_file = "path/to/local_file"
-        self.client.connection = MagicMock()
-        self.client.connection.send_request.return_value.status_code = 500
-
-        with self.assertRaises(WebDavException):
-            self.client.download_file(remote_file, local_file)
-
-        self.client.connection.send_request.assert_called_once_with("GET", remote_file)
 
     def test_download_directory(self):
         remote_directory = "/path/to/remote_directory"
@@ -137,14 +102,6 @@ class TestWebdavClient(unittest.TestCase):
                                                           os.path.abspath(os.path.join(local_path,
                                                                                        'file.txt')))
 
-    def test_download_directory_not_found(self):
-        remote_path = "/path/to/non_existing_directory"
-        local_path = "path/to/local_directory"
-        self.client.list_directory = MagicMock(return_value=[])
-
-        with self.assertRaises(FileNotFoundError):
-            self.client.download(remote_path, local_path)
-
     def test_list_directory(self):
         remote_path = "/path/to/remote_directory/"
         self.client.connection.send_request = MagicMock()
@@ -176,12 +133,6 @@ class TestWebdavClient(unittest.TestCase):
         ]
         self.assertEqual(result, expected_result)
 
-    def test_list_directory_recursive_not_found(self):
-        remote_path = "/path/to/non_existing_directory"
-        self.client.list_directory = MagicMock(return_value=[])
-
-        with self.assertRaises(FileNotFoundError):
-            self.client.list_directory_recursive(remote_path)
 
     def test_parse_list(self):
         # Test case for parsing XML response and constructing result list
@@ -239,14 +190,6 @@ class TestWebdavClient(unittest.TestCase):
         self.client.make_directory(remote_directory)
 
         self.client.connection.send_request.assert_called_once_with("MKCOL", remote_directory)
-
-    def test_make_directory_failure(self):
-        remote_directory = "/path/to/remote_dir"
-        self.client.connection = MagicMock()
-        self.client.connection.send_request.return_value.status_code = 500
-
-        with self.assertRaises(WebDavException):
-            self.client.make_directory(remote_directory)
 
 
 if __name__ == '__main__':

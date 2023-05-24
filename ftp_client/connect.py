@@ -35,7 +35,10 @@ class Connection:
             self.host = socket.gethostbyname(host)
         except socket.gaierror:
             return False
-        self.server.connect((self.host, self.PORT))
+        try:
+            self.server.connect((self.host, self.PORT))
+        except socket.error:
+            return False
         self.server.settimeout(20)
         response = self.get_response()
         if not response:

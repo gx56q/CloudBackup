@@ -34,9 +34,6 @@ class FtpClient:
         :param host: The hostname or IP address of the FTP server.
         :param user: The username to authenticate with.
         :param password: The password to authenticate with.
-
-        :raises ConnectionError: If the connection to the server cannot be established.
-        :raises ValueError: If any of the input parameters are invalid.
         """
         if not self.connection.connected:
             connect_code = self.connection.connect(host)
@@ -49,18 +46,24 @@ class FtpClient:
                     if response and response['code'] == '230':
                         self.logged_in = True
                     else:
-                        raise ValueError("Login failed.")
+                        print("Error: Invalid password.")
+                        self.connection.close()
+                        exit()
                     if self.logged_in:
                         self.connection.send_request('TYPE I')
                         self.connection.get_response()
+                else:
+                    print("Error: Invalid username.")
+                    self.connection.close()
+                    exit()
             else:
-                raise ConnectionError("Error: " + host + " is not a valid host.")
+                print(f"Error: Invalid hostname or IP address ({host}).")
+                self.connection.close()
+                exit()
 
     def close(self) -> None:
         """
         Closes the connection to the FTP server.
-
-        :raises ConnectionError: If the connection is not currently open.
 
         """
         if self._check_connection():
@@ -116,13 +119,12 @@ class FtpClient:
 
         :return: A list of strings representing the contents of the directory.
 
-        :raises ConnectionError: If the connection to the server cannot be established.
         """
         result = []
         if self._check_connection() and self._check_logged_in():
             pasv_con = self.connection.create_pasv_con()
             if not pasv_con:
-                raise ConnectionError("Error: Could not establish a connection to the server.")
+                print("Error: Could not establish a connection to the server.")
             if list_all:
                 self.connection.send_request('LIST -R ' + directory)
             else:
@@ -130,7 +132,10 @@ class FtpClient:
             self.connection.get_response()
             from_server = pasv_con.recv(4096).decode('utf-8')
             if print_result:
-                print(from_server)
+                if from_server:
+                    print(from_server)
+                else:
+                    print(f'Directory {directory} not found.')
             result = list(filter(None, from_server.strip('\r\n').split('\r\n')))
             self.connection.get_response()
             pasv_con.close()
@@ -159,7 +164,7 @@ class FtpClient:
         """
         if self._check_connection() and self._check_logged_in():
             if os.path.isfile(local_file):
-                self.connection.server.settimeout(120)
+                self.connection.server.settimeout(20)
                 if os.path.dirname(remote_file) != '':
                     self.make_directory(os.path.dirname(remote_file).replace('\\', '/'))
                 with open(local_file, 'rb') as to_send:
@@ -169,7 +174,10 @@ class FtpClient:
                               f'the file {local_file}.')
                         return False
                     self.connection.send_request('STOR ' + remote_file)
-                    self.connection.get_response()
+                    res = self.connection.get_response()
+                    if res['code'] != '150':
+                        print(f'Error: Could not upload the file {local_file}.')
+                        return False
                     response = pasv_con.send(to_send.read())
                     if response == 0:
                         print(f'Error: Could not upload the file {local_file}.')
@@ -208,7 +216,12 @@ class FtpClient:
         :param remote_dir: remote directory to upload to
         """
         if self._check_connection() and self._check_logged_in():
+            if not os.path.exists(local_dir):
+                print(f'Error: {local_dir} does not exist.')
+                self.close()
+                quit()
             if os.path.isdir(local_dir):
+                print(f'Uploading directory {local_dir} to {remote_dir}')
                 remote_dir = os.path.join(remote_dir, os.path.basename(local_dir)) \
                     .replace('\\', '/')
                 path_to_create = ''
@@ -217,7 +230,9 @@ class FtpClient:
                     self.make_directory(path_to_create)
                 self.upload_directory(local_dir, remote_dir)
             else:
+                print(f'Uploading file {local_dir} to {remote_dir}')
                 self.upload_file(local_dir, remote_dir)
+            print('Upload complete.')
 
     def download_file(self, remote_file, local_file):
         """
@@ -286,41 +301,47 @@ class FtpClient:
 
         :param remote_dir: file or directory to download from the server
         :param local_dir: directory to save files on the local machine
-        :raises FileNotFoundError: if the remote file or directory does not exist
         """
         if self._check_connection() and self._check_logged_in():
             file_list = self.list(remote_dir, False, False)
             if len(file_list) == 1:
                 if file_list[0].startswith('d'):
+                    print(f'Downloading directory {remote_dir} to {local_dir}')
                     local_dir = os.path.join(local_dir, os.path.basename(remote_dir.strip('/')))
                     asyncio.run(self.download_directory(remote_dir, local_dir))
                 else:
+                    print(f'Downloading file {remote_dir} to {local_dir}')
                     local_file = os.path.join(local_dir, os.path.basename(remote_dir))
                     self.download_file(remote_dir, local_file)
             elif len(file_list) > 1:
+                print(f'Downloading directory {remote_dir} to {local_dir}')
                 local_dir = os.path.join(local_dir, os.path.basename(remote_dir.strip('/')))
                 asyncio.run(self.download_directory(remote_dir, local_dir))
             else:
-                raise FileNotFoundError(f'No such file or directory: {remote_dir}')
+                print(f'No such file or directory: {remote_dir}')
+                self.connection.close()
+                quit()
+        print('Download complete.')
 
     def _check_connection(self) -> bool:
         """
         Checks whether the client is connected to an FTP server
 
         :return: True if connected
-        :raises ConnectionError if not connected
         """
         if self.connection.connected:
             return True
-        raise ConnectionError("You are not currently connected to a server.")
+        print("You are not currently connected to a server.")
+        quit()
 
     def _check_logged_in(self) -> bool:
         """
         Checks whether the client is logged in to an FTP server
 
         :return: True if logged in
-        :raises ConnectionError if not logged in
         """
         if self.logged_in:
             return True
-        raise ConnectionError("You are not logged in.")
+        print("You are not currently logged in to a server.")
+        self.connection.close()
+        quit()

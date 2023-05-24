@@ -2,7 +2,6 @@ import os
 import xml.etree.ElementTree as Et
 
 from webdav_api_client.connect import Connection
-from webdav_api_client.webdav_exception import WebDavException
 
 
 class WebDavClient:
@@ -33,7 +32,8 @@ class WebDavClient:
         with open(local_file, "rb") as file:
             resp = self.connection.send_request("PUT", remote_file, data=file)
             if resp.status_code not in [201, 405]:
-                raise WebDavException(resp.status_code, resp.content)
+                print(f"Error uploading file {local_file} to "
+                      f"{remote_file}: {resp.status_code} {resp.text}")
 
     def upload_directory(self, local_dir: str, remote_dir: str) -> None:
         """
@@ -65,10 +65,12 @@ class WebDavClient:
         if not remote_dir.startswith('/'):
             remote_dir = '/' + remote_dir
         if not os.path.exists(local_dir):
-            raise FileNotFoundError(f'File/directory {local_dir} not found')
+            print(f'File/directory {local_dir} not found')
+            quit()
         if os.path.isdir(local_dir):
             remote_dir = os.path.join(remote_dir, os.path.basename(local_dir)) \
                 .replace('\\', '/')
+            print(f'Uploading directory {local_dir} to {remote_dir}')
             for sub_dir in remote_dir.strip('/').split('/'):
                 path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
                 self.make_directory(path_to_create)
@@ -77,9 +79,12 @@ class WebDavClient:
             for sub_dir in remote_dir.strip('/').split('/'):
                 path_to_create = os.path.join(path_to_create, sub_dir).replace('\\', '/')
                 self.make_directory(path_to_create)
+            remote_dir = os.path.join(remote_dir, os.path.basename(local_dir)).replace('\\', '/')
+            print(f'Uploading file {local_dir} to {remote_dir}')
             self.upload_file(local_dir, os.path.join(remote_dir,
                                                      os.path.basename(local_dir))
                              .replace('\\', '/'))
+        print('Upload complete')
 
     def download_file(self, remote_file, local_file):
         """Download remote file to disk."""
@@ -92,7 +97,7 @@ class WebDavClient:
             with open(local_file, "wb") as file:
                 file.write(resp.content)
         else:
-            raise WebDavException(resp.status_code, resp.content)
+            print(f"Error downloading file {remote_file}: {resp.status_code} {resp.text}")
 
     def download_directory(self, remote_directory, local_directory):
         """Download remote directory to disk."""
@@ -118,14 +123,18 @@ class WebDavClient:
             remote_path += "/"
         directory_contents = self.list_directory(remote_path)
         if len(directory_contents) == 0:
-            raise FileNotFoundError(f'File/directory {remote_path} not found')
+            print(f'Error: file/directory {remote_path} not found')
+            quit()
         if len(directory_contents) == 1 and not directory_contents[0]['isDir']:
             local_path = os.path.abspath(local_path) + os.sep + directory_contents[0]['displayname']
+            print(f'Downloading file {remote_path} to {local_path}')
             self.download_file(remote_path, local_path)
         else:
             local_path = os.path.abspath(local_path) + os.sep + \
                          remote_path.strip("/").split("/")[-1]
+            print(f'Downloading directory {remote_path} to {local_path}')
             self.download_directory(remote_path, local_path)
+        print('Download complete.')
 
     def list_directory(self, remote_path):
         """List files in remote path."""
@@ -159,7 +168,8 @@ class WebDavClient:
         base_contents = process_directory(remote_path)
 
         if len(base_contents) == 0:
-            raise FileNotFoundError(f'File/directory {remote_path} not found')
+            print(f'File/directory {remote_path} not found')
+            quit()
 
         def format_listing(listing, indent):
             if listing['isDir']:
@@ -200,4 +210,5 @@ class WebDavClient:
             remote_directory = "/" + remote_directory
         resp = self.connection.send_request("MKCOL", remote_directory)
         if resp.status_code not in [201, 405]:
-            raise WebDavException(resp.status_code, resp.content)
+            print(f'Error creating directory {remote_directory}: {resp.status_code} {resp.content}')
+            quit()

@@ -5,7 +5,6 @@ This module contains the Connection class that handles the connection to the Web
 """
 
 import requests
-from webdav_api_client.webdav_exception import WebDavException
 
 
 class Connection:
@@ -37,12 +36,10 @@ class Connection:
         Returns:
             requests.Response: The response from the API.
 
-        Raises:
-            WebDavException: If token or login/password is not specified.
         """
         if self.token is None and (self.username is None or self.password is None):
-            raise WebDavException(400,
-                                  "Specify token or login/password for WebDav storage account.")
+            print("Error: No login/password or token for WebDav storage account.")
+            quit()
 
         if add_headers is None:
             add_headers = {}
@@ -57,4 +54,9 @@ class Connection:
 
         headers.update(add_headers)
         url = self.url + add_url
-        return requests.request(command, url, headers=headers, auth=auth, data=data)
+        res = requests.request(command, url, headers=headers, auth=auth, data=data)
+
+        if res.status_code in [401, 403]:
+            print("Error: Invalid login/password for WebDav storage account.")
+            quit()
+        return res
