@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 from unittest.mock import patch, MagicMock, Mock
 
 from ftp_client.connect import Connection
@@ -20,6 +21,196 @@ class TestFtpClient(unittest.TestCase):
         self.assertEqual(ftp_client.transfer_type, ('I', 'binary'))
         self.assertFalse(ftp_client.logged_in)
 
+    @patch('ftp_client.connect.Connection')
+    def test_connect_valid_credentials(self, mock_connection):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = False
+        host = 'example.com'
+        user = 'testuser'
+        password = 'testpassword'
+        mock_connection_instance.connect.return_value = '220'
+        mock_connection_instance.get_response.return_value = {'code': '331'}
+        self.client.connect(host, user, password)
+        mock_connection_instance.close.assert_not_called()
+
+    @patch('ftp_client.connect.Connection')
+    def test_connect_invalid_credentials(self, mock_connection):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = False
+        host = 'example.com'
+        user = 'testuser'
+        password = 'invalidpassword'
+        mock_connection_instance.connect.return_value = '220'
+        mock_connection_instance.get_response.return_value = {'code': '331'}
+        mock_connection_instance.get_response.side_effect = [
+            {'code': '230'},
+            {'code': '331'}]
+        self.client.connect(host, user, password)
+        mock_connection_instance.connect.assert_not_called()
+        self.assertFalse(self.client.logged_in)
+
+    @patch('ftp_client.connect.Connection')
+    def test_upload_file_success(self, mock_connection):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = True
+        mock_connection_instance.get_response.return_value = {'code': '150'}
+
+        local_file = 'path/to/local/file.txt'
+        remote_file = '/path/to/remote/file.txt'
+
+        with patch('builtins.open', MagicMock()) as mock_open:
+            mock_open.return_value.__enter__.return_value = b'mock file content'
+            with self.assertRaises(SystemExit):
+                self.client.upload_file(local_file, remote_file)
+
+            mock_connection_instance.create_pasv_con.assert_not_called()
+            mock_connection_instance.send_request.assert_not_called()
+            mock_connection_instance.get_response.assert_not_called()
+            mock_connection_instance.get_response.assert_not_called()
+
+    @patch('ftp_client.connect.Connection')
+    def test_upload_file_local_file_not_found(self, mock_connection):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = True
+
+        local_file = 'path/to/nonexistent/file.txt'
+        remote_file = '/path/to/remote/file.txt'
+        with self.assertRaises(SystemExit):
+            self.client.upload_file(local_file, remote_file)
+
+    @patch('ftp_client.connect.Connection')
+    def test_upload_file_connection_not_established(self, mock_connection):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = False
+
+        local_file = 'path/to/local/file.txt'
+        remote_file = '/path/to/remote/file.txt'
+
+        with self.assertRaises(SystemExit):
+            self.client.upload_file(local_file, remote_file)
+
+    @patch('ftp_client.connect.Connection')
+    def test_upload_file_invalid_response_code(self, mock_connection):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = True
+        mock_connection_instance.get_response.return_value = {'code': '200'}
+
+        local_file = 'path/to/local/file.txt'
+        remote_file = '/path/to/remote/file.txt'
+
+        with patch('builtins.open', MagicMock()) as mock_open:
+            mock_open.return_value.__enter__.return_value = b'mock file content'
+            with self.assertRaises(SystemExit):
+                self.client.upload_file(local_file, remote_file)
+
+            mock_connection_instance.create_pasv_con.assert_not_called()
+            mock_connection_instance.send_request.assert_not_called()
+            mock_connection_instance.get_response.assert_not_called()
+
+    @patch('ftp_client.connect.Connection')
+    @patch('os.path')
+    def test_upload_directory(self, mock_connection, mock_os):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = True
+        mock_connection_instance.logged_in = True
+        local_dir = '/path/to/local/dir'
+        remote_dir = '/path/to/remote/dir'
+        mock_os.listdir.return_value = ['file1.txt', 'dir1']
+        with self.assertRaises(SystemExit):
+            self.client.upload_directory(local_dir, remote_dir)
+
+    def test_upload_file(self):
+        local_file = 'path/to/local_directory/file.txt'
+        remote_file = 'path/to/remote/file.txt'
+        self.client._check_connection = MagicMock(return_value=True)
+        self.client._check_logged_in = MagicMock(return_value=True)
+        self.client.upload_file = MagicMock()
+        self.client.upload(local_file, remote_file)
+        self.assertEqual(self.client.upload_file.call_count, 1)
+
+    @patch('ftp_client.connect.Connection')
+    @patch('os.path')
+    def test_upload_nonexistent_local_dir(self, mock_connection, mock_os):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.connected = True
+        mock_connection_instance.logged_in = True
+        local_dir = '/path/to/nonexistent/dir'
+        remote_dir = '/path/to/remote/dir'
+        mock_os.path.exists.return_value = False
+        with patch('builtins.print') as mock_print:
+            with self.assertRaises(SystemExit):
+                self.client.upload(local_dir, remote_dir)
+            mock_print.assert_called_with('You are not currently logged in to a server.')
+
+    @patch('os.path')
+    @patch('asyncio.get_event_loop')
+    @patch('ftp_client.connect.Connection')
+    def test_download_directory_existing_local_dir(self, mock_connection, mock_asyncio, mock_os):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.list.return_value = [
+            'drwxrwxr-x 2 user group 4096 May 1 10:00 dir1',
+            '-rw-rw-r-- 1 user group 2048 May 1 10:00 file1.txt',
+            '-rw-rw-r-- 1 user group 3072 May 1 10:00 file2.txt'
+        ]
+        remote_dir = '/remote/dir'
+        local_dir = '/local/dir'
+        mock_os.path.exists.return_value = True
+        self.client.download_directory(remote_dir, local_dir)
+        mock_os.makedirs.assert_not_called()
+        mock_asyncio.get_running_loop.assert_not_called()
+        mock_asyncio.get_running_loop().run_in_executor.assert_not_called()
+
+    @patch('os.path')
+    @patch('asyncio.get_event_loop')
+    @patch('ftp_client.connect.Connection')
+    def test_download_directory_new_local_dir(self, mock_connection, mock_asyncio, mock_os):
+        mock_connection_instance = mock_connection.return_value
+        mock_connection_instance.list.return_value = [
+            '-rw-rw-r-- 1 user group 2048 May 1 10:00 file1.txt',
+            '-rw-rw-r-- 1 user group 3072 May 1 10:00 file2.txt'
+        ]
+        remote_dir = '/remote/dir'
+        local_dir = '/local/dir'
+
+        mock_os.path.exists.return_value = False
+
+        self.client.download_directory(remote_dir, local_dir)
+
+        mock_os.makedirs.assert_not_called()
+
+        mock_connection_instance.download_directory.assert_not_called()
+        mock_asyncio.get_running_loop.assert_not_called()
+        mock_asyncio.get_running_loop().run_in_executor.assert_not_called()
+
+    @patch('ftp_client.connect.Connection')
+    def test_download_nonexistent_file_or_directory(self, mock_connection):
+        remote_dir = '/path/to/nonexistent'
+        local_dir = '/path/to/local'
+        with patch('ftp_client.print'), \
+                patch.object(self.client, 'connection') as mock_client_connection:
+            with self.assertRaises(SystemExit):
+                self.client.download(remote_dir, local_dir)
+            mock_client_connection.close.assert_called_once()
+            mock_connection.assert_not_called()
+
+    @patch('ftp_client.connect.Connection')
+    def test_upload_nonexistent_file_or_directory(self, mock_connection):
+        local_dir = '/path/to/nonexistent'
+        remote_dir = '/path/to/remote'
+        with patch('ftp_client.print'), \
+                patch.object(self.client, 'connection') as mock_client_connection:
+            with self.assertRaises(SystemExit):
+                self.client.upload(local_dir, remote_dir)
+            mock_client_connection.close.assert_called_once()
+            mock_connection.assert_not_called()
+
+    def test_connect_already_connected(self):
+        """
+        Tests that the `connect` method returns False if the client is already connected.
+        """
+        self.client.connection.connected = True
+        self.assertFalse(self.client.connect('localhost', 'username', 'password'))
+
     def test_connect_invalid(self):
         """
         Tests that the `connect` method returns False if the connection fails.
@@ -40,7 +231,6 @@ class TestFtpClient(unittest.TestCase):
             side_effect=ConnectionError('Error: ' + host + ' is not a valid host.'))
         with self.assertRaises(ConnectionError):
             self.client.connect(host, user, password)
-
 
     def test_close(self):
         """
@@ -131,14 +321,6 @@ class TestFtpClient(unittest.TestCase):
         self.assertFalse(self.client.upload_file(local_file, remote_file))
 
 
-    def test_upload_file(self):
-        local_file = 'path/to/local_directory/file.txt'
-        remote_file = 'path/to/remote/file.txt'
-        self.client._check_connection = MagicMock(return_value=True)
-        self.client._check_logged_in = MagicMock(return_value=True)
-        self.client.upload_file = MagicMock()
-        self.client.upload(local_file, remote_file)
-        self.assertEqual(self.client.upload_file.call_count, 1)
 
     def test_download_file_not_found(self):
         remote_file = 'path/to/nonexistent/file.txt'
@@ -150,7 +332,6 @@ class TestFtpClient(unittest.TestCase):
         self.client.connection.get_response = MagicMock(return_value={'code': '550'})
         self.client.connection.get_response.return_value = {'code': '550'}
         self.assertFalse(self.client.download_file(remote_file, local_file))
-
 
     def test_download_directory_file_list_single_file(self):
         remote_dir = '/path/to/remote/file.txt'
@@ -179,6 +360,14 @@ class TestFtpClient(unittest.TestCase):
         self.client.download_file(remote_file, local_file)
         self.assertEqual(self.client.connection.server.settimeout.call_count, 1)
         self.assertEqual(self.client.connection.create_pasv_con.call_count, 1)
+
+    def test_check_connection_disconnected(self):
+        self.client.connection.connected = False
+        with patch('builtins.print') as mock_print, self.assertRaises(SystemExit) as cm:
+            self.client._check_connection()
+
+        self.assertEqual(cm.exception.code, None)  # Ensure SystemExit was raised with no exit code
+        mock_print.assert_called_once_with("You are not currently connected to a server.")
 
 
 if __name__ == '__main__':

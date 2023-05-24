@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from dotenv import load_dotenv, find_dotenv
 from webdav_api_client.webdav_client import WebDavClient
@@ -55,7 +55,6 @@ class TestWebdavClient(unittest.TestCase):
 
         self.client.make_directory.assert_called_once_with(remote_dir)
 
-
     def test_download_file_success(self):
         remote_file = "path/to/remote_file"
         local_file = "path/to/local_file"
@@ -70,6 +69,54 @@ class TestWebdavClient(unittest.TestCase):
         with open(local_file, "rb") as file:
             self.assertEqual(file.read(), b"file_content")
 
+    def test_upload_with_existing_local_dir(self):
+        with patch.object(self.client, 'make_directory') as mock_make_dir, \
+                patch.object(self.client, 'upload_directory') as mock_upload_dir:
+            with self.assertRaises(SystemExit):
+                self.client.upload('path/to/local_dir', 'path/to/remote_dir')
+            mock_make_dir.assert_not_called()
+            mock_upload_dir.assert_not_called()
+
+    def test_upload_with_non_existing_local_dir(self):
+        with patch.object(self.client, 'make_directory') as mock_make_dir, \
+                patch.object(self.client, 'upload_file') as mock_upload_file:
+            with patch('os.path.exists', return_value=False):
+                with self.assertRaises(SystemExit):
+                    self.client.upload('non_existing_dir', 'path/to/remote_dir')
+                mock_make_dir.assert_not_called()
+                mock_upload_file.assert_not_called()
+
+    def test_upload_with_existing_local_file(self):
+        with patch.object(self.client, 'make_directory') as mock_make_dir, \
+                patch.object(self.client, 'upload_file') as mock_upload_file:
+            self.client.upload('path/to/local_file', 'path/to/remote_dir')
+            self.assertEqual(mock_make_dir.call_count, 3)
+            mock_upload_file.assert_called_once_with(os.path.abspath('path/to/local_file'),
+                                                     '/path/to/remote_dir/local_file/local_file')
+
+    def test_download_directory_with_existing_remote_directory(self):
+        with patch('os.path.exists', return_value=False), \
+                patch('os.makedirs'):
+            with patch.object(self.client, 'list_directory') as mock_list_dir, \
+                    patch.object(self.client, 'download_directory') as mock_download_dir, \
+                    patch.object(self.client, 'download_file'):
+                mock_list_dir.return_value = [
+                    {'path': '/remote_dir/', 'isDir': True, 'displayname': 'subdir1'},
+                    {'path': '/remote_dir/subdir1/', 'isDir': False, 'displayname': 'file1.txt'}
+                ]
+                self.client.download_directory('/remote_dir/', 'path/to/local_dir')
+                mock_download_dir.assert_called_once_with('/remote_dir/', 'path/to/local_dir')
+
+    def test_download_directory_with_non_existing_remote_directory(self):
+        with patch('os.path.exists', return_value=False), \
+                patch('os.makedirs'):
+            with patch.object(self.client, 'list_directory') as mock_list_dir, \
+                    patch.object(self.client, 'download_directory') as mock_download_dir, \
+                    patch.object(self.client, 'download_file') as mock_download_file:
+                mock_list_dir.return_value = []
+                self.client.download_directory('/non_existing_remote_dir/', 'path/to/local_dir')
+                mock_download_dir.assert_called_once()
+                mock_download_file.assert_not_called()
 
     def test_download_directory(self):
         remote_directory = "/path/to/remote_directory"
@@ -85,7 +132,6 @@ class TestWebdavClient(unittest.TestCase):
         ])
         self.client.download_file = MagicMock()
         self.client.download_directory = MagicMock()
-
         self.client.download_directory(remote_directory, local_directory)
 
     def test_download_single_file(self):
@@ -95,9 +141,7 @@ class TestWebdavClient(unittest.TestCase):
             {'path': '/path/to/remote_file/', 'displayname': 'file.txt', 'isDir': False},
         ])
         self.client.download_file = MagicMock()
-
         self.client.download(remote_path, local_path)
-
         self.client.download_file.assert_called_once_with('/path/to/remote_file/',
                                                           os.path.abspath(os.path.join(local_path,
                                                                                        'file.txt')))
@@ -132,7 +176,6 @@ class TestWebdavClient(unittest.TestCase):
              'isDir': True},
         ]
         self.assertEqual(result, expected_result)
-
 
     def test_parse_list(self):
         # Test case for parsing XML response and constructing result list

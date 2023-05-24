@@ -66,7 +66,7 @@ class WebDavClient:
             remote_dir = '/' + remote_dir
         if not os.path.exists(local_dir):
             print(f'File/directory {local_dir} not found')
-            quit()
+            exit()
         if os.path.isdir(local_dir):
             remote_dir = os.path.join(remote_dir, os.path.basename(local_dir)) \
                 .replace('\\', '/')
@@ -124,7 +124,7 @@ class WebDavClient:
         directory_contents = self.list_directory(remote_path)
         if len(directory_contents) == 0:
             print(f'Error: file/directory {remote_path} not found')
-            quit()
+            exit()
         if len(directory_contents) == 1 and not directory_contents[0]['isDir']:
             local_path = os.path.abspath(local_path) + os.sep + directory_contents[0]['displayname']
             print(f'Downloading file {remote_path} to {local_path}')
@@ -169,7 +169,7 @@ class WebDavClient:
 
         if len(base_contents) == 0:
             print(f'File/directory {remote_path} not found')
-            quit()
+            exit()
 
         def format_listing(listing, indent):
             if listing['isDir']:
@@ -211,4 +211,4 @@ class WebDavClient:
         resp = self.connection.send_request("MKCOL", remote_directory)
         if resp.status_code not in [201, 405]:
             print(f'Error creating directory {remote_directory}: {resp.status_code} {resp.content}')
-            quit()
+            exit()
