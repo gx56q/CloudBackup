@@ -39,7 +39,7 @@ class Connection:
         """
         if self.token is None and (self.username is None or self.password is None):
             print("Error: No login/password or token for WebDav storage account.")
-            quit()
+            exit()
 
         if add_headers is None:
             add_headers = {}
@@ -58,5 +58,5 @@ class Connection:
 
         if res.status_code in [401, 403]:
             print("Error: Invalid login/password for WebDav storage account.")
-            quit()
+            exit()
         return res

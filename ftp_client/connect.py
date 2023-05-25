@@ -72,7 +72,7 @@ class Connection:
         except socket.timeout:
             print("Timeout error, connection closed")
             self.close()
-            return None
+            exit()
 
     @staticmethod
     def _parse_response(response):
