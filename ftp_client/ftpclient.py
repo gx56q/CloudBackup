@@ -47,18 +47,15 @@ class FtpClient:
                         self.logged_in = True
                     else:
                         print("Error: Invalid password.")
-                        self.connection.close()
                         exit()
                     if self.logged_in:
                         self.connection.send_request('TYPE I')
                         self.connection.get_response()
                 else:
                     print("Error: Invalid username.")
-                    self.connection.close()
                     exit()
             else:
                 print(f"Error: Invalid hostname or IP address ({host}).")
-                self.connection.close()
                 exit()
 
     def close(self) -> None:
