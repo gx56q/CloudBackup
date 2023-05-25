@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 from click.testing import CliRunner
@@ -95,8 +96,9 @@ class TestCli(unittest.TestCase):
         Tests that the CLI runs without errors.
         """
         try:
-            # Run the CLI from the main.py file,  note that main.py is in the root directory and not in the tests directory
-            exec(open('C:\\Users\\andre\\PycharmProjects\\CloudBackup\\main.py').read())
+            path = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+            path = os.path.join(path, 'main.py')
+            exec(open(path).read())
         except Exception as e:
             self.fail(f"CLI failed to run with error: {e}")
 
