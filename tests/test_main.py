@@ -96,7 +96,8 @@ class TestCli(unittest.TestCase):
         Tests that the CLI runs without errors.
         """
         try:
-            path = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+            # get CloudBackup/main.py path
+            path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             path = os.path.join(path, 'main.py')
             exec(open(path).read())
         except Exception as e:

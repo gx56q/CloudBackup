@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import patch, MagicMock, Mock, call
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -28,33 +28,26 @@ class TestFtpClient(unittest.TestCase):
         self.assertEqual(ftp_client.transfer_type, ('I', 'binary'))
         self.assertFalse(ftp_client.logged_in)
 
-    @patch('ftp_client.connect.Connection')
-    def test_connect_valid_credentials(self, mock_connection):
-        mock_connection_instance = mock_connection.return_value
-        mock_connection_instance.connected = False
-        host = 'example.com'
-        user = 'testuser'
-        password = 'testpassword'
-        mock_connection_instance.connect.return_value = '220'
-        mock_connection_instance.get_response.return_value = {'code': '331'}
-        self.client.connect(host, user, password)
-        mock_connection_instance.close.assert_not_called()
+    def test_connect_invalid_host(self):
+        client = FtpClient()
+        user = self.username
+        password = self.password
+        with self.assertRaises(SystemExit):
+            client.connect("invalidhost", user, password)
 
-    @patch('ftp_client.connect.Connection')
-    def test_connect_invalid_credentials(self, mock_connection):
-        mock_connection_instance = mock_connection.return_value
-        mock_connection_instance.connected = False
-        host = 'example.com'
-        user = 'testuser'
-        password = 'invalidpassword'
-        mock_connection_instance.connect.return_value = '220'
-        mock_connection_instance.get_response.return_value = {'code': '331'}
-        mock_connection_instance.get_response.side_effect = [
-            {'code': '230'},
-            {'code': '331'}]
-        self.client.connect(host, user, password)
-        mock_connection_instance.connect.assert_not_called()
-        self.assertFalse(self.client.logged_in)
+    def test_connect_invalid_password(self):
+        client = FtpClient()
+        user = self.username
+        password = "invalid_password"
+        with self.assertRaises(SystemExit):
+            client.connect(self.host, user, password)
+
+    def test_connect_success(self):
+        client = FtpClient()
+        user = self.username
+        password = self.password
+        client.connect(self.host, user, password)
+        self.assertTrue(client.logged_in)
 
     @patch('ftp_client.connect.Connection')
     def test_upload_file_success(self, mock_connection):
@@ -240,15 +233,35 @@ class TestFtpClient(unittest.TestCase):
             self.client.connect(host, user, password)
 
     def test_close(self):
-        """
-        Tests that the `close` method closes the connection to the server.
-        """
-        with patch.object(self.client, '_check_connection', return_value=True):
-            with patch('ftp_client.connect.Connection.send_request'):
-                with patch('ftp_client.connect.Connection.get_response'):
-                    with patch('ftp_client.connect.Connection.close'):
-                        self.client.close()
-                        self.assertFalse(self.client.logged_in)
+        self.client.connection = MagicMock()
+        self.client.connection.connected = True
+        self.client.connection.send_request.return_value = None
+        self.client.connection.get_response.return_value = {'code': '221'}
+        self.client.close()
+        self.assertFalse(self.client.logged_in)
+        self.client.connection.send_request.assert_called_with('QUIT')
+        self.client.connection.get_response.assert_called_once()
+        self.client.connection.close.assert_called_once()
+
+    def test_send_pass_success(self):
+        self.client.connection = MagicMock()
+        self.client.connection.send_request.return_value = None
+        self.client.connection.get_response.return_value = {'code': '230'}
+        result = self.client._send_pass('password')
+        self.assertTrue(result)
+        self.assertTrue(self.client.logged_in)
+        self.client.connection.send_request.assert_called_with('PASS password')
+        self.client.connection.get_response.assert_called_once()
+
+    def test_send_pass_failure(self):
+        self.client.connection = MagicMock()
+        self.client.connection.send_request.return_value = None
+        self.client.connection.get_response.return_value = {'code': '530'}
+        result = self.client._send_pass('password')
+        self.assertFalse(result)
+        self.assertFalse(self.client.logged_in)
+        self.client.connection.send_request.assert_called_with('PASS password')
+        self.client.connection.get_response.assert_called_once()
 
     def test_send_pass_invalid(self):
         """
@@ -327,8 +340,6 @@ class TestFtpClient(unittest.TestCase):
         self.client._check_logged_in = MagicMock(return_value=True)
         self.assertFalse(self.client.upload_file(local_file, remote_file))
 
-
-
     def test_download_file_not_found(self):
         remote_file = 'path/to/nonexistent/file.txt'
         local_file = 'path/to/local_directory/file.txt'
@@ -373,7 +384,7 @@ class TestFtpClient(unittest.TestCase):
         with patch('builtins.print') as mock_print, self.assertRaises(SystemExit) as cm:
             self.client._check_connection()
 
-        self.assertEqual(cm.exception.code, None)  # Ensure SystemExit was raised with no exit code
+        self.assertEqual(cm.exception.code, None)
         mock_print.assert_called_once_with("You are not currently connected to a server.")
 
 

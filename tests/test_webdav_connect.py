@@ -10,6 +10,7 @@ class TestWebdavConnect(unittest.TestCase):
     """
        This class contains unit tests for the `Connection` class.
     """
+
     def setUp(self):
         """
         Set up a Connection object for testing.
@@ -17,6 +18,7 @@ class TestWebdavConnect(unittest.TestCase):
         load_dotenv(find_dotenv('config.env'))
         self.password = os.getenv('WEBDAW_PASS')
         self.username = os.getenv('WEBDAW_USER')
+        self.token = os.getenv('WEBDAW_TOKEN')
         self.connection = Connection(cloud_type='yadisk')
 
     def test_init(self):
@@ -36,6 +38,13 @@ class TestWebdavConnect(unittest.TestCase):
         response = self.connection.send_request("GET")
         self.assertIsInstance(response, requests.Response)
 
+    def test_send_request_no_username_password(self):
+        """
+        Tests that the `send_request` method returns a response when a username and password are
+        not provided.
+        """
+        with self.assertRaises(SystemExit):
+            self.connection.send_request("GET")
 
     def test_send_request_add_url(self):
         """
@@ -49,13 +58,24 @@ class TestWebdavConnect(unittest.TestCase):
 
     def test_send_request_data(self):
         """
-        Tests that the `send_request` method returns a response with the data included in the request body.
+        Tests that the `send_request` method returns a response with the data included in the
+        request body.
         """
         self.connection.username = self.username
         self.connection.password = self.password
         data = {"key": "value"}
         response = self.connection.send_request("POST", data=data)
         self.assertEqual(response.request.body, 'key=value')
+
+    def test_send_request_with_wrong_user_pass(self):
+        """
+        Tests that the `send_request` method raises a `SystemExit` exception when a username and
+        password are provided but are incorrect.
+        """
+        self.connection.username = "wrong_username"
+        self.connection.password = "wrong_password"
+        with self.assertRaises(SystemExit):
+            self.connection.send_request("GET")
 
 
 if __name__ == '__main__':
