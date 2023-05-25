@@ -9,6 +9,8 @@ from webdav_api_client.webdav_client import WebDavClient
 class TestWebdavClient(unittest.TestCase):
     def setUp(self):
         load_dotenv(find_dotenv('config.env'))
+        self.password = os.getenv('WEBDAW_PASS')
+        self.username = os.getenv('WEBDAW_USER')
         self.client = WebDavClient()
 
     def test_set_token(self):

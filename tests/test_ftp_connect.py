@@ -1,5 +1,9 @@
+import os
 import unittest
 import socket
+
+from dotenv import load_dotenv, find_dotenv
+
 from ftp_client.connect import Connection
 
 
@@ -11,6 +15,10 @@ class TestFTPConnection(unittest.TestCase):
         """
         Initializes the Connection object for testing.
         """
+        load_dotenv(find_dotenv('config.env'))
+        self.password = os.getenv('FTP_PASS')
+        self.username = os.getenv('FTP_USER')
+        self.host = os.getenv('FTP_HOST')
         self.conn = Connection()
 
     def test_connect_success(self):

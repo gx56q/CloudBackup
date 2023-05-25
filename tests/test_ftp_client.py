@@ -1,6 +1,8 @@
+import os
 import unittest
-from unittest import mock
 from unittest.mock import patch, MagicMock, Mock
+
+from dotenv import find_dotenv, load_dotenv
 
 from ftp_client.connect import Connection
 from ftp_client.ftpclient import FtpClient
@@ -12,6 +14,11 @@ class TestFtpClient(unittest.TestCase):
     """
 
     def setUp(self):
+        load_dotenv(find_dotenv('config.env'))
+        self.password = os.getenv('FTP_PASS')
+        self.username = os.getenv('FTP_USER')
+        self.host = os.getenv('FTP_HOST')
+        self.host = os.getenv('FTP_HOST')
         self.client = FtpClient()
         self.client.connection = MagicMock()
 
